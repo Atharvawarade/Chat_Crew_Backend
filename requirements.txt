@@ -1,1 +1,36 @@
  
+# Core Framework
+flask==3.0.2
+flask-cors==4.0.0
+flask-session==2.0.0
+python-dotenv==1.0.0
+gunicorn==21.2.0
+
+# PDF Processing
+PyPDF2==3.0.1
+
+# AI/ML Components
+langchain==0.1.5
+langchain-google-genai==0.0.11
+langchain-community==0.0.29
+google-generativeai==0.3.2
+faiss-cpu==1.7.4  # Use faiss-cpu for Render compatibility
+
+# Firebase Integration
+firebase-admin==6.2.0
+
+# Voice Processing (if used)
+SpeechRecognition==3.10.0
+pydub==0.25.1
+
+# Networking/APIs
+requests==2.31.0
+urllib3==2.0.7
+
+# Security
+python-jose==3.3.0  # JWT support if needed
+cryptography==41.0.7
+
+# Utilities
+numpy==1.26.2
+tqdm==4.66.1  # Progress bars for long operations
