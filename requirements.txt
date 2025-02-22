@@ -8,10 +8,10 @@ gunicorn==21.2.0
 # PDF Processing
 PyPDF2==3.0.1
 
-# AI/ML Components (Updated versions)
+# AI/ML Components (Updated to latest compatible versions)
 langchain==0.1.16
-langchain-google-genai==0.0.14  # Updated version
-google-generativeai==0.5.0     # Compatible version
+langchain-google-genai==0.0.11  # Latest available version
+google-generativeai==0.4.1      # Compatible with langchain-google-genai
 faiss-cpu==1.7.4
 
 # Firebase Integration
