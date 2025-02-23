@@ -26,3 +26,6 @@ cryptography==41.0.7
 
 # Utilities
 numpy==1.26.2
+
+speechrecognition==3.10.0
+pyaudio==0.2.13
