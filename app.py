@@ -46,7 +46,7 @@ firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DB_URL})
 
 # Flask app initialization
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+CORS(app, origins=["https://student-assistance-chatbot-chatcrew.netlify.app/"], supports_credentials=True)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-secret')
 Session(app)
