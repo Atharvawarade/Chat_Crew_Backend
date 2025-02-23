@@ -159,12 +159,20 @@ def download_pdfs(pdf_urls):
                 print(f"❌ Failed to download {url}: {e}")
         
         print(f"✅ Downloaded {new_downloads} new PDFs")
+
+
 def create_vector_store():
     global vector_store_initialized
     print("\n🧠 Creating vector store...")
     
     try:
+        if not os.path.exists(JSON_BACKUP_FILE):
+            print("❌ Missing Firebase backup file!")
+            raise FileNotFoundError("Firebase backup file not found")
+
         text = extract_combined_text()
+        if len(text) < 100:  # Minimum expected text length
+            raise ValueError("Insufficient text data for vectorization")
         splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=500)
         chunks = splitter.split_text(text)
         
@@ -190,7 +198,8 @@ def create_vector_store():
         
         print("✅ Vector store updated!")
     except Exception as e:
-        print(f"❌ Error creating vector store: {e}")
+        print(f"❌ Critical error in vector store creation: {str(e)}")
+        # Add email notification or log to Firebase
         raise
 
 def extract_combined_text():
@@ -331,13 +340,48 @@ def voice_input():
 
 @app.route('/health')
 def health_check():
-    return jsonify({"status": "healthy", "version": "1.0.0"}), 200
+    status = {
+        "vector_store": os.path.exists(VECTOR_STORE_PATH),
+        "firebase_connected": False,
+        "google_api": bool(os.getenv("GOOGLE_API_KEY")),
+        "session_secret": bool(app.secret_key)
+    }
+    
+    try:
+        db.reference('/').get()
+        status['firebase_connected'] = True
+    except Exception as e:
+        status['firebase_error'] = str(e)
+        
+    return jsonify(status), 200
 
 @app.route('/check-secret')
 def check_secret():
     if not app.secret_key:
         return "Secret key not configured!", 500
     return "Secret key is properly configured!", 200    
+
+
+@app.route('/debug/vector-store')
+def debug_vector_store():
+    try:
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        vector_store = FAISS.load_local(VECTOR_STORE_PATH, embeddings, allow_dangerous_deserialization=True)
+        return jsonify({
+            "status": "exists",
+            "documents": len(vector_store.docstore._dict),
+            "last_modified": os.path.getmtime(os.path.join(VECTOR_STORE_PATH, "index.faiss"))
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/debug/rebuild-vector-store')
+def rebuild_vector_store():
+    try:
+        create_vector_store()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500  
 
 
 if __name__ == "__main__":
