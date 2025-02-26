@@ -11,6 +11,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from flask_session import Session
@@ -247,6 +248,53 @@ MAX_HISTORY_LENGTH = 5  # Maintain last 5 exchanges
 HISTORY_FORMAT = """User: {question}
 Assistant: {answer}"""
 
+from langchain.chains import LLMChain  # Add this import
+
+
+def query_vector_store(question):
+    try:
+        if not os.path.exists(VECTOR_STORE_PATH):
+            raise ValueError("Vector store not found. Please initialize it first.")
+
+        print(f"Querying vector store with question: {question}")
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        vector_store = FAISS.load_local(VECTOR_STORE_PATH, embeddings, allow_dangerous_deserialization=True)
+        docs = vector_store.similarity_search(question)
+        
+        # Build context from documents
+        context = "\n\n".join([doc.page_content for doc in docs])
+        
+        history = session.get("history", "")
+        chain = get_conversational_chain()
+        
+        # Get response from chain
+        response = chain.predict(
+            history=history,
+            context=context,
+            question=question
+        )
+
+        response_text = response.strip()
+        if not response_text:
+            return "I couldn't find that information. Could you please rephrase or provide more details?"
+
+        # Update conversation history
+        new_entry = HISTORY_FORMAT.format(question=question, answer=response_text)
+        if history:
+            entries = history.split('\n')
+            entries = entries[-(MAX_HISTORY_LENGTH*2-2):]
+            entries.append(new_entry)
+            session["history"] = '\n'.join(entries)
+        else:
+            session["history"] = new_entry
+
+        session.modified = True
+        return response_text
+
+    except Exception as e:
+        print(f"Error processing question: {e}")
+        return "I'm having trouble answering that right now. Please try again later."
+
 def get_conversational_chain():
     print("Creating conversational chain...")
     prompt_template = """You are a helpful university assistant. Use the following context and conversation history to answer the question.
@@ -264,45 +312,8 @@ Answer in clear, short sentences:"""
     
     model = ChatGoogleGenerativeAI(model="gemini-1.5-pro", client=genai, temperature=0.3)
     prompt = PromptTemplate(template=prompt_template, input_variables=["history", "context", "question"])
-    return load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
+    return LLMChain(llm=model, prompt=prompt)
 
-def query_vector_store(question):
-    try:
-        if not os.path.exists(VECTOR_STORE_PATH):
-            raise ValueError("Vector store not found. Please initialize it first.")
-
-        print(f"Querying vector store with question: {question}")
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        vector_store = FAISS.load_local(VECTOR_STORE_PATH, embeddings, allow_dangerous_deserialization=True)
-        docs = vector_store.similarity_search(question)
-
-        history = session.get("history", "")
-        chain = get_conversational_chain()
-        response = chain({"input_documents": docs, "history": history, "question": question}, return_only_outputs=True)
-
-        response_text = response.get("output_text", "").strip()
-        if not response_text:
-            return "I couldn't find that information. Could you please rephrase or provide more details?"
-
-        # Update conversation history
-        new_entry = HISTORY_FORMAT.format(question=question, answer=response_text)
-        if history:
-            # Split history and maintain length limit
-            entries = history.split('\n')
-            entries = entries[-(MAX_HISTORY_LENGTH*2-2):]  # Keep last N-1 exchanges
-            entries.append(new_entry)
-            session["history"] = '\n'.join(entries)
-        else:
-            session["history"] = new_entry
-
-        # Ensure session is saved
-        session.modified = True
-
-        return response_text
-
-    except Exception as e:
-        print(f"Error processing question: {e}")
-        return "I'm having trouble answering that right now. Please try again later."
 
 @app.route("/query", methods=["POST"])
 def handle_query():
